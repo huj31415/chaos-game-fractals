@@ -14,12 +14,14 @@ const ui = {
   calcR: document.getElementById("calcR"),
   radiusInput: document.getElementById("radius"),
   speedIn: document.getElementById("speed"),
-  restrict: document.getElementById("restrict")
+  restrict: document.getElementById("restrict"),
+  colorPoints: document.getElementById("color"),
 };
 
 let backgroundColor = "black";
 let foregroundColor = "white";
 
+let colorPts = true;
 
 const canvas = document.querySelector("#canvas");
 const ctx = canvas.getContext("2d");
@@ -110,22 +112,26 @@ window.onresize = () => {
     canvas.onwheel = (event) => {
       if (!event.ctrlKey) {
         let zoomfactor = Math.sign(event.deltaY) < 0 ? 1.05 : 1 / 1.05;
-        ctx.transform(
-          zoomfactor,
-          0,
-          0,
-          zoomfactor,
-          (-(zoomfactor - 1) * canvas.width) / 2,
-          (-(zoomfactor - 1) * canvas.height) / 2
-        );
+
+        // Get the current transformation matrix
+        let transform = ctx.getTransform();
+
+        // Calculate the current center of the canvas in world coordinates
+        let centerX = (canvas.width / 2 - transform.e) / transform.a;
+        let centerY = (canvas.height / 2 - transform.f) / transform.d;
+
+        // Apply the zoom
+        ctx.translate(centerX, centerY);
+        ctx.scale(zoomfactor, zoomfactor);
+        ctx.translate(-centerX, -centerY);
+
         totalZoom *= zoomfactor;
         viewport.x /= zoomfactor;
         viewport.y /= zoomfactor;
         ui.viewport.innerText = Math.floor(viewport.x) + " x " + Math.floor(viewport.y);
-        
-        // zero.x -= panOffset.x;
-        // zero.y -= panOffset.y;
 
+        // totalOffset.x -= totalOffset.x * (1 - zoomfactor)
+        // totalOffset.y -= totalOffset.y * (1 - zoomfactor)
         // clearCanvas();
         updateShape();
         ui.zoom.innerText = (totalZoom * 100).toFixed(2); //~~(totalZoom * 10000) / 100;
@@ -134,10 +140,11 @@ window.onresize = () => {
   }
 }
 
-
+let nsides;
 let r = 0.5;
 let useCalcR = true;
 let radius = 256;
+let inradius;
 let speed = 625;
 let restriction = "none"; // noVtxRepeat || vtxNotAdjacent1Side || vtxNotAdjacent2Sides || vtxNot2Away || noAdjacent2InARowR0.5
 
@@ -195,6 +202,11 @@ let restriction = "none"; // noVtxRepeat || vtxNotAdjacent1Side || vtxNotAdjacen
     fpsCtx.fillStyle = backgroundColor;
     fpsCtx.fillRect(0, 0, fpsGraph.width, fpsGraph.height);
   });
+
+  ui.colorPoints.addEventListener("input", (event) => {
+    colorPts = event.target.checked;
+    updateShape();
+  });
 }
 
 let points = [];
@@ -219,13 +231,7 @@ function updateShape() {
   points = [];
   vtxInd = 0;
 
-  // clearCanvas();
-
   ctx.fillStyle = backgroundColor;
-  // let x = center.x - viewport.x / 2 - totalOffset.x;
-  // let y = center.y - viewport.y / 2 - totalOffset.y;
-  // ctx.fillRect(x, y, viewport.x / totalZoom, viewport.y / totalZoom);
-  // ctx.strokeRect(x, y, viewport.x / totalZoom, viewport.y / totalZoom);
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -233,8 +239,10 @@ function updateShape() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  let sides = parseInt(ui.nSidesInput.value);
+  let sides = nsides = parseInt(ui.nSidesInput.value);
   let angle = 2 * Math.PI / sides;
+
+  inradius = radius * Math.cos(angle / 2);
 
   if (useCalcR && restriction != "noAdjacent2InARowR0.5") {
     let A = 0;
@@ -246,6 +254,7 @@ function updateShape() {
     r = 0.5;
   }
   ctx.strokeStyle = foregroundColor;
+  ctx.lineWidth = 1 / totalZoom;
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     let point = [radius * Math.sin(angle * i), radius * Math.cos(angle * i)];
@@ -264,6 +273,19 @@ function drawPoint(x = 0, y = 0, r = 5, drawColor = foregroundColor) {
   ctx.fill();
 }
 
+/**
+ * Converts a color from HSL to RGB for the heatmap
+ * @param {Number} h hue as an angle [0, 360]
+ * @param {Number} s saturation [0, 1]
+ * @param {Number} l lightness [0, 1]
+ * @returns An array with the RGB color values [0, 1]
+ */
+function hsl2rgb(h, s, l) {
+  let a = s * Math.min(l, 1 - l);
+  let f = (n, k = (n + h / 30) % 12) => l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+  return [f(0), f(8), f(4)];
+}
+
 let dx, dy;
 let point = [];
 let vtxInd;
@@ -271,9 +293,21 @@ let vtxIndPrev;
 let vtxInd2Prev;
 
 function update() {
+  // debug
+  // drawPoint(0, 0, 5);
+  // ctx.strokeRect(0, 0, canvas.width, canvas.height)
+  // drawPoint(center.x, center.y, 5);
+  // drawPoint(center.x - totalOffset.x, center.y - totalOffset.y, 5);
+  // drawPoint(center.x - totalOffset.x * (2 - totalZoom), center.y - totalOffset.y * (2 - totalZoom), 5);
+
   if (steps == 0) {
     vtxInd = vtxIndPrev = vtxInd2Prev = null;
-    point = [center.x, center.y]; // replace with random point gen
+    // point = [center.x, center.y]; // replace with random point gen
+    // rand point gen within incircle
+    // let ang = rand(0, Math.PI * 2);
+    // let rad = rand(0, inradius);
+    // point = [center.x + rad * Math.cos(ang), center.y + rad * Math.sin(ang)];
+    point = [rand(0, canvas.width), rand(0, canvas.height)];
   }
   for (let i = 0; i < speed; i++) {
     vtxInd2Prev = vtxIndPrev;
@@ -298,7 +332,14 @@ function update() {
     //   point[0] >= 0 && point[0] <= canvas.width &&
     //   point[1] >= 0 && point[1] <= canvas.height
     // )
-    drawPoint(point[0], point[1], .5);
+    if (steps > 10) { // skip the first few random points
+      if (colorPts) {
+        let color = hsl2rgb((360 / nsides) * vtxInd, 1, 0.5);
+        drawPoint(point[0], point[1], .5, `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`);
+      } else {
+        drawPoint(point[0], point[1], .5);
+      }
+    }
     steps++;
   }
   updateGraphs(100);
