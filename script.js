@@ -222,10 +222,16 @@ function updateShape() {
   // clearCanvas();
 
   ctx.fillStyle = backgroundColor;
-  let x = center.x - viewport.x / 2 - totalOffset.x;
-  let y = center.y - viewport.y / 2 - totalOffset.y;
-  ctx.fillRect(x, y, viewport.x, viewport.y);
-  ctx.strokeRect(x, y, viewport.x, viewport.y);
+  // let x = center.x - viewport.x / 2 - totalOffset.x;
+  // let y = center.y - viewport.y / 2 - totalOffset.y;
+  // ctx.fillRect(x, y, viewport.x / totalZoom, viewport.y / totalZoom);
+  // ctx.strokeRect(x, y, viewport.x / totalZoom, viewport.y / totalZoom);
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
   let sides = parseInt(ui.nSidesInput.value);
   let angle = 2 * Math.PI / sides;
