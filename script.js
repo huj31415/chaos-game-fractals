@@ -199,36 +199,27 @@ let steps = 0;
 
 const rand = (min = 0, max = 1) => (Math.random() * (max - min) + min);
 
-
-function arrMinMax(array = []) {
-  let min = Infinity;
-  let max = -Infinity;
-  array.forEach((n) => {
-    if (n > max) max = n;
-    if (n < min) min = n;
-  });
-  return { min: min, max: max };
-}
-// Array.prototype.max
-
+/**
+ * Updates and redraws the shape
+ */
 function updateShape() {
   steps = 0;
   points = [];
   vtxInd = 0;
 
+  // clear canvas
   ctx.fillStyle = backgroundColor;
-
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  // ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
   let sides = nsides = parseInt(ui.nSidesInput.value);
   let angle = 2 * Math.PI / sides;
 
-  inradius = radius * Math.cos(angle / 2);
+  // inradius = radius * Math.cos(angle / 2);
 
+  // set r value
   if (useCalcR && restriction != "noAdjacent2InARowR0.5") {
     let A = 0;
     for (let i = 1; i <= Math.floor(sides / 4); i++)
@@ -238,17 +229,20 @@ function updateShape() {
   } else if (restriction == "noAdjacent2InARowR0.5") {
     r = 0.5;
   }
+
+  // generate and draw the shape
   ctx.strokeStyle = foregroundColor;
   ctx.lineWidth = 1 / totalZoom;
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     let point = [center.x - radius * Math.sin(angle * i), center.y - radius * Math.cos(angle * i)];
     points.push(point);
-    // ctx.strokeStyle = foregroundColor;
     ctx.lineTo(point[0], point[1]);
   }
   ctx.closePath();
   ctx.stroke();
+
+  // label vertices with colors if necessary
   if (colorPts) {
     points.forEach((point, i) => {
       let color = hsl2rgb((360 / nsides) * i, 1, backgroundColor == "black" ? 0.5 : 0.4);
@@ -257,6 +251,13 @@ function updateShape() {
   }
 }
 
+/**
+ * Draws a point at a coordinate
+ * @param {Number} x x coordinate of point
+ * @param {Number} y y coordinate of point
+ * @param {Number} r radius of point
+ * @param {string} drawColor color of point
+ */
 function drawPoint(x = 0, y = 0, r = 5, drawColor = foregroundColor) {
   ctx.beginPath();
   ctx.arc(x, y, r / totalZoom, 0, Math.PI * 2, true);
@@ -284,6 +285,9 @@ let vtxInd;
 let vtxIndPrev;
 let vtxInd2Prev;
 
+/**
+ * Run every frame to add more points
+ */
 function update() {
   if (steps == 0) {
     vtxInd = vtxIndPrev = vtxInd2Prev = null;
@@ -294,32 +298,40 @@ function update() {
     // point = [center.x + rad * Math.cos(ang), center.y + rad * Math.sin(ang)];
     point = [rand(0, canvas.width), rand(0, canvas.height)];
   }
+  // run several iterations per frame
   for (let i = 0; i < speed; i++) {
     vtxInd2Prev = vtxIndPrev;
     vtxIndPrev = vtxInd;
-    vtxInd = Math.floor(rand(0, points.length));
-    while (
-      (restriction == "noVtxRepeat" && vtxInd == vtxIndPrev) ||
-      (restriction == "vtxNotAdjacent1Side" && (vtxInd == (vtxIndPrev + 1) % points.length)) ||
-      (restriction == "vtxNotAdjacent2Sides" &&
-        (vtxInd == (vtxIndPrev + 1) % points.length || (vtxInd + 1) % points.length == vtxIndPrev)) ||
-      (restriction == "vtxNot2Away" &&
-        (vtxInd == (vtxIndPrev + 2) % points.length || (vtxInd + 2) % points.length == vtxIndPrev)) ||
-      (restriction == "noAdjacent2InARowR0.5" && (vtxIndPrev == vtxInd2Prev) &&
-        (vtxInd == (vtxIndPrev + 1) % points.length || (vtxInd + 1) % points.length == vtxIndPrev))
-    )
-      vtxInd = Math.floor(rand(0, points.length));
 
+    // generate a list of valid vertex indices based on the restriction
+    let validIndices = points.map((_, index) => index).filter(index => {
+      if (restriction == "noVtxRepeat" && index == vtxIndPrev) return false;
+      if (restriction == "vtxNotAdjacent1Side" && index == (vtxIndPrev + 1) % points.length) return false;
+      if (restriction == "vtxNotAdjacent2Sides" &&
+        (index == (vtxIndPrev + 1) % points.length || (index + 1) % points.length == vtxIndPrev)) return false;
+      if (restriction == "vtxNot2Away" &&
+        (index == (vtxIndPrev + 2) % points.length || (index + 2) % points.length == vtxIndPrev)) return false;
+      if (restriction == "noAdjacent2InARowR0.5" && vtxIndPrev == vtxInd2Prev &&
+        (index == (vtxIndPrev + 1) % points.length || (index + 1) % points.length == vtxIndPrev)) return false;
+
+      return true; // This index is valid
+    });
+
+    // randomly select an index from the valid ones
+    if (validIndices.length > 0) {
+      vtxInd = validIndices[Math.floor(rand(0, validIndices.length))];
+    }
+    
+    // calculate point difference from target vertex
     dx = points[vtxInd][0] - point[0];
     dy = points[vtxInd][1] - point[1];
+    // move point to new location based on r
     point[0] += dx * r;
     point[1] += dy * r;
-    // if (
-    //   point[0] >= 0 && point[0] <= canvas.width &&
-    //   point[1] >= 0 && point[1] <= canvas.height
-    // )
+
     // skip the first few random points
     if (steps > 10) {
+      // draw the points
       if (colorPts) {
         let color = hsl2rgb((360 / nsides) * vtxInd, 1, backgroundColor == "black" ? 0.5 : 0.4);
         drawPoint(point[0], point[1], .5, `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`);
@@ -337,7 +349,10 @@ updateShape();
 
 update();
 
-
+/**
+ * Update the fps graph
+ * @param {Number} interval update rate in ms
+ */
 function updateGraphs(interval) {
   // get fps
   frameCount++;
