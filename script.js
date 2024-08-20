@@ -16,6 +16,7 @@ const ui = {
   speedIn: document.getElementById("speed"),
   restrict: document.getElementById("restrict"),
   colorPoints: document.getElementById("color"),
+  mouseZoom: document.getElementById("mouseZoom"),
 };
 
 let backgroundColor = "black";
@@ -34,6 +35,7 @@ let center = { x: canvas.width / 2, y: canvas.height / 2 };
 let panOffset = { x: 0, y: 0 };
 let totalOffset = { x: 0, y: 0 };
 let totalZoom = 1;
+let mouseCentered = true;
 
 const fpsGraph = document.getElementById("fpsGraph");
 const fpsCtx = fpsGraph.getContext("2d");
@@ -98,20 +100,31 @@ window.onresize = () => {
     canvas.onmousemove = (event) => { mouseX = event.clientX; mouseY = event.clientY }
 
     canvas.onwheel = (event) => {
+      event.preventDefault();
       if (!event.ctrlKey) {
         let zoomfactor = Math.sign(event.deltaY) < 0 ? 1.05 : 1 / 1.05;
 
         // Get the current transformation matrix
         let transform = ctx.getTransform();
+        let tx, ty;
+        if (mouseCentered) {
+          // Get mouse position relative to the canvas
+          let mouseX = event.clientX - canvas.getBoundingClientRect().left;
+          let mouseY = event.clientY - canvas.getBoundingClientRect().top;
 
-        // Calculate the current center of the canvas in world coordinates
-        let centerX = (canvas.width / 2 - transform.e) / transform.a;
-        let centerY = (canvas.height / 2 - transform.f) / transform.d;
+          // Calculate the current mouse position in world coordinates
+          tx = (mouseX - transform.e) / transform.a;
+          ty = (mouseY - transform.f) / transform.d;
+        } else {
+          // Calculate the current center of the canvas in world coordinates
+          tx = (canvas.width / 2 - transform.e) / transform.a;
+          ty = (canvas.height / 2 - transform.f) / transform.d;
+        }
 
         // Apply the zoom
-        ctx.translate(centerX, centerY);
+        ctx.translate(tx, ty);
         ctx.scale(zoomfactor, zoomfactor);
-        ctx.translate(-centerX, -centerY);
+        ctx.translate(-tx, -ty);
 
         totalZoom *= zoomfactor;
         viewport.x /= zoomfactor;
@@ -135,31 +148,31 @@ let restriction = "none"; // noVtxRepeat || vtxNotAdjacent1Side || vtxNotAdjacen
 
 // event listeners
 {
-  ui.nSidesInput.addEventListener("input", updateShape);
+  ui.nSidesInput.oninput = updateShape;
 
-  ui.rInput.addEventListener("input", (event) => {
+  ui.rInput.oninput = (event) => {
     if (!useCalcR) r = parseFloat(event.target.value);
     updateShape();
-  });
+  }
 
-  ui.calcR.addEventListener("input", (event) => {
+  ui.calcR.oninput = (event) => {
     if (restriction != "noAdjacent2InARowR0.5")
       useCalcR = ui.rInput.disabled = event.target.checked;
     if (!useCalcR) r = parseFloat(ui.rInput.value)
     updateShape();
-  });
+  }
 
   // const radius = Math.round(canvas.width * 0.4);
-  ui.radiusInput.addEventListener("input", (event) => {
+  ui.radiusInput.oninput = (event) => {
     radius = parseInt(event.target.value ** 2);
     updateShape();
-  });
+  }
 
-  ui.speedIn.addEventListener("input", (event) => {
+  ui.speedIn.oninput = (event) => {
     speed = parseInt(event.target.value ** 2);
-  });
+  }
 
-  ui.restrict.addEventListener("input", (event) => {
+  ui.restrict.oninput = (event) => {
     restriction = event.target.value;
     if (restriction == "noAdjacent2InARowR0.5") {
       r = 0.5;
@@ -168,9 +181,9 @@ let restriction = "none"; // noVtxRepeat || vtxNotAdjacent1Side || vtxNotAdjacen
       ui.rInput.disabled = useCalcR = ui.calcR.checked;
     }
     updateShape();
-  });
+  }
 
-  ui.dark.addEventListener("input", (event) => {
+  ui.dark.oninput = (event) => {
     if (event.target.checked) {
       foregroundColor = "white";
       backgroundColor = "black";
@@ -186,12 +199,16 @@ let restriction = "none"; // noVtxRepeat || vtxNotAdjacent1Side || vtxNotAdjacen
     xCoord = 0;
     fpsCtx.fillStyle = backgroundColor;
     fpsCtx.fillRect(0, 0, fpsGraph.width, fpsGraph.height);
-  });
+  }
 
-  ui.colorPoints.addEventListener("input", (event) => {
+  ui.colorPoints.oninput = (event) => {
     colorPts = event.target.checked;
     updateShape();
-  });
+  }
+
+  ui.mouseZoom.oninput = (event) => {
+    mouseCentered = event.target.checked;
+  }
 }
 
 let points = [];
@@ -321,7 +338,7 @@ function update() {
     if (validIndices.length > 0) {
       vtxInd = validIndices[Math.floor(rand(0, validIndices.length))];
     }
-    
+
     // calculate point difference from target vertex
     dx = points[vtxInd][0] - point[0];
     dy = points[vtxInd][1] - point[1];
