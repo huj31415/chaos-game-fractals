@@ -175,14 +175,14 @@ let restriction = "none"; // noVtxRepeat || vtxNotAdjacent1Side || vtxNotAdjacen
   });
 
   ui.restrict.addEventListener("input", (event) => {
-    updateShape();
     restriction = event.target.value;
     if (restriction == "noAdjacent2InARowR0.5") {
       r = 0.5;
       ui.rInput.disabled = true;
     } else {
-      ui.rInput.disabled = ui.calcR.checked;
+      ui.rInput.disabled = useCalcR = ui.calcR.checked;
     }
+    updateShape();
   });
 
   ui.dark.addEventListener("input", (event) => {
@@ -257,12 +257,19 @@ function updateShape() {
   ctx.lineWidth = 1 / totalZoom;
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
-    let point = [radius * Math.sin(angle * i), radius * Math.cos(angle * i)];
+    let point = [center.x - radius * Math.sin(angle * i), center.y - radius * Math.cos(angle * i)];
     points.push(point);
-    ctx.lineTo(center.x - point[0], center.y + point[1]);
+    // ctx.strokeStyle = foregroundColor;
+    ctx.lineTo(point[0], point[1]);
   }
   ctx.closePath();
   ctx.stroke();
+  if (colorPts) {
+    points.forEach((point, i) => {
+      let color = hsl2rgb((360 / nsides) * i, 1, backgroundColor == "black" ? 0.5 : 0.4);
+      drawPoint(point[0], point[1], 2, `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`);
+    });
+  }
 }
 
 function drawPoint(x = 0, y = 0, r = 5, drawColor = foregroundColor) {
@@ -293,12 +300,6 @@ let vtxIndPrev;
 let vtxInd2Prev;
 
 function update() {
-  // debug
-  // drawPoint(0, 0, 5);
-  // ctx.strokeRect(0, 0, canvas.width, canvas.height)
-  // drawPoint(center.x, center.y, 5);
-  // drawPoint(center.x - totalOffset.x, center.y - totalOffset.y, 5);
-  // drawPoint(center.x - totalOffset.x * (2 - totalZoom), center.y - totalOffset.y * (2 - totalZoom), 5);
 
   if (steps == 0) {
     vtxInd = vtxIndPrev = vtxInd2Prev = null;
@@ -324,17 +325,18 @@ function update() {
         (vtxInd == (vtxIndPrev + 1) % points.length || (vtxInd + 1) % points.length == vtxIndPrev))
     )
       vtxInd = Math.floor(rand(0, points.length));
+
     dx = points[vtxInd][0] - point[0];
     dy = points[vtxInd][1] - point[1];
-    point[0] += (dx + center.x) * r;
-    point[1] += (dy + center.y) * r;
+    point[0] += dx * r;
+    point[1] += dy * r;
     // if (
     //   point[0] >= 0 && point[0] <= canvas.width &&
     //   point[1] >= 0 && point[1] <= canvas.height
     // )
     if (steps > 10) { // skip the first few random points
       if (colorPts) {
-        let color = hsl2rgb((360 / nsides) * vtxInd, 1, 0.5);
+        let color = hsl2rgb((360 / nsides) * vtxInd, 1, backgroundColor == "black" ? 0.5 : 0.4);
         drawPoint(point[0], point[1], .5, `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`);
       } else {
         drawPoint(point[0], point[1], .5);
@@ -366,7 +368,7 @@ function updateGraphs(interval) {
     // draw fps graph
     xCoord += 2;
     fpsCtx.beginPath();
-    fpsCtx.strokeStyle = fps >= 15 ? (fps >= 30 ? backgroundColor == "black" ? "lightgreen" : "green" : "orange") : "red"; //"white";
+    fpsCtx.strokeStyle = fps >= 15 ? (fps >= 30 ? (backgroundColor == "black" ? "lightgreen" : "green") : "orange") : "red"; //"white";
     fpsCtx.lineWidth = 1;
     fpsCtx.moveTo(xCoord % fpsGraph.width, fpsGraph.height);
     fpsCtx.lineTo(xCoord % fpsGraph.width, fpsGraph.height - fps);
@@ -378,18 +380,5 @@ function updateGraphs(interval) {
 
     frameCount = 0;
     lastTime = currentTime;
-
-    // draw bodycount graph
-    // bodyCtx.beginPath();
-    // bodyCtx.strokeStyle =
-    //   activeBodies >= 500 ? "red" : activeBodies >= 200 ? "orange" : "lightgreen";
-    // bodyCtx.lineWidth = 1;
-    // bodyCtx.moveTo(xCoord % bodyGraph.width, bodyGraph.height);
-    // bodyCtx.lineTo(xCoord % bodyGraph.width, bodyGraph.height - activeBodies / 8);
-    // // bodyCtx.closePath();
-    // bodyCtx.stroke();
-    // bodyCtx.fillStyle = "rgba(0, 0, 0, 0.02)";
-    // bodyCtx.fillRect(0, 0, (xCoord % bodyGraph.width) - 2, bodyGraph.height);
-    // bodyCtx.fillRect((xCoord % bodyGraph.width) + 2, 0, bodyGraph.width, bodyGraph.height);
   }
 }
