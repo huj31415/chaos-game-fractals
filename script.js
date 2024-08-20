@@ -21,7 +21,7 @@ const ui = {
 let backgroundColor = "black";
 let foregroundColor = "white";
 
-let colorPts = true;
+let colorPts = false;
 
 const canvas = document.querySelector("#canvas");
 const ctx = canvas.getContext("2d");
@@ -34,16 +34,11 @@ let center = { x: canvas.width / 2, y: canvas.height / 2 };
 let panOffset = { x: 0, y: 0 };
 let totalOffset = { x: 0, y: 0 };
 let totalZoom = 1;
-let zero = { x: (canvas.width - viewport.x) / 2, y: (canvas.height - viewport.y) / 2 };
 
 const fpsGraph = document.getElementById("fpsGraph");
 const fpsCtx = fpsGraph.getContext("2d");
-// const bodyGraph = document.getElementById("bodyGraph");
-// const bodyCtx = bodyGraph.getContext("2d");
 fpsCtx.fillStyle = "black";
 fpsCtx.fillRect(0, 0, canvas.width, canvas.height);
-// bodyCtx.fillStyle = "rgba(0, 0, 0, 1)";
-// bodyCtx.fillRect(0, 0, canvas.width, canvas.height);
 let xCoord = 0;
 
 let lastTime = performance.now();
@@ -58,9 +53,6 @@ window.onresize = () => {
   ui.viewport.innerText = canvas.width + " x " + canvas.height;
 
   center = { x: canvas.width / 2, y: canvas.height / 2 };
-  // viewport.x = canvas.width;// / totalzoom;
-  // viewport.y = canvas.height;// / totalzoom;
-  zero = { x: (canvas.width - viewport.x) / 2, y: (canvas.height - viewport.y) / 2 };
   updateShape();
 };
 // interaction
@@ -92,10 +84,6 @@ window.onresize = () => {
       panOffset.y = event.movementY / totalZoom;
       totalOffset.x += panOffset.x;
       totalOffset.y += panOffset.y;
-      // center.x -= panOffset.x;
-      // center.y -= panOffset.y;
-      zero.x -= panOffset.x;
-      zero.y -= panOffset.y;
 
       ctx.translate(panOffset.x, panOffset.y);
       // clearCanvas();
@@ -130,11 +118,8 @@ window.onresize = () => {
         viewport.y /= zoomfactor;
         ui.viewport.innerText = Math.floor(viewport.x) + " x " + Math.floor(viewport.y);
 
-        // totalOffset.x -= totalOffset.x * (1 - zoomfactor)
-        // totalOffset.y -= totalOffset.y * (1 - zoomfactor)
-        // clearCanvas();
         updateShape();
-        ui.zoom.innerText = (totalZoom * 100).toFixed(2); //~~(totalZoom * 10000) / 100;
+        ui.zoom.innerText = (totalZoom * 100).toFixed(2);
       }
     };
   }
@@ -300,7 +285,6 @@ let vtxIndPrev;
 let vtxInd2Prev;
 
 function update() {
-
   if (steps == 0) {
     vtxInd = vtxIndPrev = vtxInd2Prev = null;
     // point = [center.x, center.y]; // replace with random point gen
@@ -334,7 +318,8 @@ function update() {
     //   point[0] >= 0 && point[0] <= canvas.width &&
     //   point[1] >= 0 && point[1] <= canvas.height
     // )
-    if (steps > 10) { // skip the first few random points
+    // skip the first few random points
+    if (steps > 10) {
       if (colorPts) {
         let color = hsl2rgb((360 / nsides) * vtxInd, 1, backgroundColor == "black" ? 0.5 : 0.4);
         drawPoint(point[0], point[1], .5, `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`);
